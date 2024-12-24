@@ -4,11 +4,11 @@ import { Box, Button, Typography } from '@mui/material';
 import FileUpload from './components/fileUpload';
 import AgentPanel from './components/AgentPanel';
 
+
 const App: React.FC = () => {
   return (
     <Router>
       <Routes>
-        {/* Route for Home */}
         <Route
           path="/"
           element={

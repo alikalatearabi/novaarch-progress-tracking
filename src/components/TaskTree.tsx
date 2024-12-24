@@ -6,14 +6,30 @@ import {
   TextField,
   Collapse,
   IconButton,
+  useTheme,
+  alpha,
+  LinearProgress,
+  ToggleButtonGroup,
+  ToggleButton,
 } from '@mui/material';
-import { ExpandMore, ExpandLess } from '@mui/icons-material';
+import { 
+  ExpandMore, 
+  ExpandLess, 
+  CheckCircleOutline,
+  TableChart,
+  InsertChart,
+} from '@mui/icons-material';
+import GanttChart from './GanttChart'; 
+import DateGanttChart from './dateGanttChart';
 
 interface Task {
   id: string;
   name: string;
-  progress?: number; // Optional progress
+  progress?: number;
   children: Task[];
+  startDate?: string;
+  endDate?: string;
+  duration: {value: string}
 }
 
 interface TaskTreeProps {
@@ -21,11 +37,12 @@ interface TaskTreeProps {
 }
 
 const TaskTree: React.FC<TaskTreeProps> = ({ projectId }) => {
+  const theme = useTheme();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set());
+  const [viewMode, setViewMode] = useState<'list' | 'chart'>('list');
 
   useEffect(() => {
-    // Fetch project data from backend
     fetch(`http://localhost:5000/api/tasks/${projectId}`)
       .then((response) => response.json())
       .then((data) => setTasks(data))
@@ -46,7 +63,7 @@ const TaskTree: React.FC<TaskTreeProps> = ({ projectId }) => {
   const updateTaskProgress = (tasks: Task[], taskId: string, progress: number): Task[] => {
     return tasks.map((task) => {
       if (task.id === taskId) {
-        return { ...task, progress }; // Update the task's progress
+        return { ...task, progress };
       } else if (task.children.length > 0) {
         const updatedChildren = updateTaskProgress(task.children, taskId, progress);
         const parentProgress = calculateParentProgress(updatedChildren);
@@ -67,15 +84,16 @@ const TaskTree: React.FC<TaskTreeProps> = ({ projectId }) => {
 
   const renderTasks = (tasks: Task[]): JSX.Element[] => {
     return tasks.map((task) => {
-      const dotCount = task.id.split('.').length - 1; // Count the number of dots in the ID
-      const isEditable = dotCount === 2; // Editable only for two-dot tasks
+      const dotCount = task.id.split('.').length - 1;
+      const isEditable = dotCount === 2;
+      const progress = task.progress ?? 0;
 
       return (
         <Box
           key={task.id}
           sx={{
             marginBottom: 2,
-            paddingLeft: `${dotCount * 16}px`, // Indentation based on dot count
+            paddingLeft: `${dotCount * 16}px`,
           }}
         >
           <Box
@@ -83,60 +101,97 @@ const TaskTree: React.FC<TaskTreeProps> = ({ projectId }) => {
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
-              backgroundColor: isEditable ? '#f9fbfd' : '#ffffff',
-              padding: '8px 16px',
-              borderRadius: 1,
-              border: '1px solid #e0e0e0',
-              boxShadow: isEditable ? '0 2px 4px rgba(0, 0, 0, 0.1)' : 'none',
-              cursor: task.children.length > 0 ? 'pointer' : 'default', // Pointer cursor for expandable rows
+              backgroundColor: theme.palette.background.paper,
+              padding: '12px 16px',
+              borderRadius: 2,
+              border: `1px solid ${alpha(theme.palette.primary.main, 0.2)}`,
+              boxShadow: theme.shadows[1],
+              transition: 'all 0.3s ease',
+              '&:hover': {
+                transform: 'translateY(-2px)',
+                boxShadow: theme.shadows[3],
+              },
+              cursor: task.children.length > 0 ? 'pointer' : 'default',
             }}
-            onClick={() => task.children.length > 0 && toggleExpand(task.id)} // Toggle when clicking on the row
+            onClick={() => task.children.length > 0 && toggleExpand(task.id)}
           >
             <Box sx={{ display: 'flex', alignItems: 'center', flexGrow: 1 }}>
               {task.children.length > 0 && (
                 <IconButton
                   size="small"
                   onClick={(e) => {
-                    e.stopPropagation(); // Prevent row click event
+                    e.stopPropagation();
                     toggleExpand(task.id);
                   }}
-                  sx={{ marginRight: 1 }}
+                  sx={{ 
+                    marginRight: 1,
+                    color: theme.palette.primary.main,
+                  }}
                 >
                   {expandedTasks.has(task.id) ? <ExpandLess /> : <ExpandMore />}
                 </IconButton>
               )}
-              <Typography
-                variant="body1"
-                sx={{
-                  fontWeight: dotCount === 0 ? 'bold' : 'normal',
-                  color: dotCount === 0 ? '#333' : '#555',
-                  flexGrow: 1,
-                  textAlign: 'right', // Align text to the right for Persian
-                }}
-              >
-                {task.name} ({task.id})
-              </Typography>
+              <Box sx={{ flexGrow: 1 }}>
+                <Typography
+                  variant="body1"
+                  sx={{
+                    fontWeight: dotCount === 0 ? 'bold' : 'normal',
+                    color: dotCount === 0 ? theme.palette.text.primary : theme.palette.text.secondary,
+                    textAlign: 'right',
+                  }}
+                >
+                  {task.name} ({task.id})
+                </Typography>
+                <LinearProgress
+                  variant="determinate"
+                  value={progress}
+                  sx={{
+                    height: 6,
+                    borderRadius: 3,
+                    marginTop: 1,
+                    backgroundColor: alpha(theme.palette.primary.main, 0.2),
+                    '& .MuiLinearProgress-bar': {
+                      backgroundColor: progress === 100 
+                        ? theme.palette.success.main 
+                        : theme.palette.primary.main,
+                    },
+                  }}
+                />
+              </Box>
             </Box>
-            {isEditable ? (
-              <TextField
-                size="small"
-                type="number"
-                variant="outlined"
-                value={task.progress ?? 0} // Default progress to 0
-                onChange={(e) => handleProgressChange(task.id, Number(e.target.value))}
-                onClick={(e) => e.stopPropagation()} // Prevent row click event
-                sx={{
-                  width: 80,
-                  '& input': {
-                    textAlign: 'center', // Align text inside input
-                  },
-                }}
-              />
-            ) : (
-              <Typography variant="body2" sx={{ fontWeight: 'bold', width: 80, textAlign: 'center' }}>
-                {(task.progress ?? 0).toFixed(2)}% {/* Default progress to 0 */}
-              </Typography>
-            )}
+            <Box sx={{ display: 'flex', alignItems: 'center' }}>
+              {isEditable ? (
+                <TextField
+                  size="small"
+                  type="number"
+                  variant="outlined"
+                  value={progress}
+                  onChange={(e) => handleProgressChange(task.id, Number(e.target.value))}
+                  onClick={(e) => e.stopPropagation()}
+                  sx={{
+                    width: 100,
+                    '& input': {
+                      direction: 'ltr',
+                      textAlign: 'center',
+                    },
+                  }}
+                />
+              ) : (
+                <Typography 
+                  variant="body2" 
+                  sx={{ 
+                    fontWeight: 'bold', 
+                    width: 100, 
+                    textAlign: 'center',
+                    color: progress === 100 
+                      ? theme.palette.success.main 
+                      : theme.palette.text.secondary,
+                  }}
+                >
+                  {progress.toFixed(0)}%
+                </Typography>
+              )}
+            </Box>
           </Box>
           {task.children.length > 0 && (
             <Collapse in={expandedTasks.has(task.id)} timeout="auto" unmountOnExit>
@@ -148,39 +203,103 @@ const TaskTree: React.FC<TaskTreeProps> = ({ projectId }) => {
     });
   };
 
+  const calculateDuration = (startDate?: string, endDate?: string): number => {
+    if (startDate && endDate) {
+      const start = new Date(startDate);
+      const end = new Date(endDate);
+      const durationInMs = end.getTime() - start.getTime();
+      return Math.ceil(durationInMs / (1000 * 60 * 60 * 24)); // Convert milliseconds to days
+    }
+    return 1; // Default duration if dates are missing
+  };
+
+  const transformTasksForGantt = (tasks: Task[]): any[] => {
+    return tasks.map((task) => ({
+      id: parseInt(task.id),
+      text: task.name,
+      start: task.startDate ? new Date(task.startDate) : new Date(),
+      end: task.endDate ? new Date(task.endDate) : new Date(),
+      duration: calculateDuration(task.startDate, task.endDate), // Duration could be dynamically calculated
+      progress: task.progress ?? 0,
+      type: task.children.length > 0 ? 'summary' : 'task',
+      parent: task.children.length > 0 ? undefined : parseInt(task.id.split('.').slice(0, -1).join('.')),
+    }));
+  };
+
   return (
     <Box
       sx={{
-        direction: 'rtl', // Add RTL directionality for Persian text
-        backgroundColor: '#f7f9fc',
+        direction: 'rtl',
+        backgroundColor: theme.palette.background.default,
         padding: 3,
-        borderRadius: 2,
-        boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)',
+        borderRadius: 3,
+        boxShadow: theme.shadows[2],
       }}
     >
-      <Typography
-        variant="h5"
-        sx={{
-          marginBottom: 3,
-          textAlign: 'right', // Align text to the right for Persian
-          fontWeight: 'bold',
-        }}
-      >
-        وظایف پروژه: {projectId}
-      </Typography>
-      {renderTasks(tasks)}
-      <Button
-        variant="contained"
-        color="primary"
-        sx={{
-          marginTop: 3,
-          padding: '10px 20px',
-          fontSize: '1rem',
-        }}
-        onClick={() => console.log('Submit data to backend:', tasks)}
-      >
-        ذخیره پیشرفت
-      </Button>
+      <Box sx={{ 
+        display: 'flex', 
+        justifyContent: 'space-between', 
+        alignItems: 'center', 
+        marginBottom: 3 
+      }}>
+        <Typography
+          variant="h4"
+          sx={{
+            textAlign: 'right',
+            fontWeight: 'bold',
+            color: theme.palette.primary.main,
+          }}
+        >
+          وظایف پروژه: {projectId}
+        </Typography>
+        
+        <ToggleButtonGroup
+          value={viewMode}
+          exclusive
+          onChange={(e, value) => value && setViewMode(value)}
+          sx={{
+            '& .MuiToggleButton-root': {
+              borderRadius: 2,
+            }
+          }}
+          style={{direction: 'ltr'}}
+        >
+          <ToggleButton value="list">
+            <TableChart />
+          </ToggleButton>
+          <ToggleButton value="chart" style={{borderLeft: '1px solid rgba(0, 0, 0, 0.12)', marginLeft: '10px'}}>
+            <InsertChart />
+          </ToggleButton>
+        </ToggleButtonGroup>
+      </Box>
+
+      {viewMode === 'list' ? (
+        <>
+          {renderTasks(tasks)}
+          <Button
+            variant="contained"
+            color="primary"
+            startIcon={<CheckCircleOutline style={{marginLeft: '15px'}}/>}
+            sx={{
+              marginTop: 3,
+              padding: '12px 24px',
+              fontSize: '1rem',
+              borderRadius: 2,
+              boxShadow: theme.shadows[3],
+              transition: 'all 0.3s ease',
+              '&:hover': {
+                transform: 'translateY(-2px)',
+                boxShadow: theme.shadows[6],
+              },
+            }}
+            onClick={() => console.log('Submit data to backend:', tasks)}
+          >
+            ذخیره پیشرفت
+          </Button>
+        </>
+      ) : (
+        <DateGanttChart tasks={transformTasksForGantt(tasks)}/> 
+      )}
     </Box>
   );
 };

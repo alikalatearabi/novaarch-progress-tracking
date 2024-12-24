@@ -16,16 +16,39 @@ import {
   DialogContentText,
   DialogTitle,
   Button,
+  alpha,
+  CssBaseline,
 } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
-import TaskTree from './TaskTree'; // Import TaskTree component
+import FolderOpenIcon from '@mui/icons-material/FolderOpen';
+import TaskTree from './TaskTree';
+import { createTheme, ThemeProvider } from '@mui/material/styles';
 
 const AgentPanel: React.FC = () => {
+  const theme = createTheme({
+    components: {
+      MuiCssBaseline: {
+        styleOverrides: {
+          body: {
+            margin: 0,
+            padding: 0,
+          },
+        },
+      },
+      MuiTableCell: {
+        styleOverrides: {
+          root: {
+            padding: '12px',
+          },
+        },
+      },
+    },
+  });
   const [projectNames, setProjectNames] = useState<string[]>([]);
-  const [selectedProject, setSelectedProject] = useState<string | null>(null); // Selected project to show tasks
-  const [dialogOpen, setDialogOpen] = useState(false); // Dialog visibility
+  const [selectedProject, setSelectedProject] = useState<string | null>(null);
+  const [projectToDelete, setProjectToDelete] = useState<string | null>(null);
+  const [dialogOpen, setDialogOpen] = useState(false);
 
-  // Fetch project names from backend
   useEffect(() => {
     fetchProjects();
   }, []);
@@ -37,165 +60,236 @@ const AgentPanel: React.FC = () => {
       .catch((error) => console.error('Error fetching project names:', error));
   };
 
-  const handleDeleteClick = (projectName: string) => {
-    setSelectedProject(projectName);
+  const handleDeleteClick = (projectName: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setProjectToDelete(projectName);
     setDialogOpen(true);
   };
 
   const handleCloseDialog = () => {
-    setSelectedProject(null);
+    setProjectToDelete(null);
     setDialogOpen(false);
   };
 
   const handleConfirmDelete = () => {
-    if (selectedProject) {
-      fetch(`http://localhost:5000/api/tasks/projects/${selectedProject}`, {
+    if (projectToDelete) {
+      fetch(`http://localhost:5000/api/tasks/projects/${projectToDelete}`, {
         method: 'DELETE',
       })
         .then((response) => {
           if (response.ok) {
             setProjectNames((prev) =>
-              prev.filter((name) => name !== selectedProject)
+              prev.filter((name) => name !== projectToDelete)
             );
+            handleCloseDialog();
           } else {
             console.error('Failed to delete project');
           }
         })
-        .catch((error) => console.error('Error deleting project:', error))
-        .finally(() => {
-          setSelectedProject(null);
-          setDialogOpen(false);
-        });
+        .catch((error) => console.error('Error deleting project:', error));
     }
   };
 
   if (selectedProject) {
     return (
-      <Box sx={{ padding: 4 }}>
+      <Box
+        sx={{
+          padding: 4,
+          backgroundColor: theme.palette.background.default,
+          minHeight: '100vh'
+        }}
+      >
         <Button
-          variant="contained"
-          sx={{ marginBottom: 3 }}
+          startIcon={<FolderOpenIcon />}
+          variant="outlined"
+          sx={{
+            marginBottom: 3,
+            borderRadius: 2,
+            textTransform: 'none',
+          }}
           onClick={() => setSelectedProject(null)}
         >
           Back to Projects
         </Button>
-        <TaskTree projectId={selectedProject} /> {/* Render TaskTree */}
+        <TaskTree projectId={selectedProject} />
       </Box>
     );
   }
 
   return (
-    <Box
-      sx={{
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        padding: 4,
-        backgroundColor: '#f7f9fc',
-        minHeight: '100vh',
-      }}
-    >
-      {/* Header */}
+    <ThemeProvider theme={theme}>
+      <CssBaseline />
       <Box
         sx={{
-          width: '100%',
-          padding: 2,
-          backgroundColor: '#1976d2',
-          color: 'white',
-          borderRadius: 1,
-          marginBottom: 4,
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          backgroundColor: theme.palette.background.default,
+          minHeight: '100vh',
         }}
       >
-        <Typography variant="h4" align="center">
-          Agent Panel
-        </Typography>
-      </Box>
+        {/* Modern Header */}
+        <Box
+          sx={{
+            width: '100%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            background: `linear-gradient(135deg, ${theme.palette.primary.main}, ${theme.palette.primary.dark})`,
+            color: 'white',
+            marginBottom: 4,
+            padding: 3,
+            boxShadow: theme.shadows[4],
+          }}
+        >
+          <Typography
+            variant="h4"
+            sx={{
+              fontWeight: 'bold',
+              letterSpacing: '0.05em',
+              textShadow: '0 2px 4px rgba(0,0,0,0.2)'
+            }}
+          >
+            Project Management
+          </Typography>
+        </Box>
 
-      {/* Table */}
-      <TableContainer
-        component={Paper}
-        sx={{
-          maxWidth: 700,
-          borderRadius: 2,
-          boxShadow: '0px 4px 12px rgba(0, 0, 0, 0.1)',
-        }}
-      >
-        <Table>
-          <TableHead>
-            <TableRow sx={{ backgroundColor: '#f0f4f8' }}>
-              <TableCell align="center" sx={{ fontWeight: 'bold' }}>
-                Project Names
-              </TableCell>
-              <TableCell align="center" sx={{ fontWeight: 'bold' }}>
-                Actions
-              </TableCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {projectNames.map((name, index) => (
+        {/* Table Container */}
+        <TableContainer
+          component={Paper}
+          sx={{
+            maxWidth: 1200,
+            width: '100%',
+            borderRadius: 3,
+            boxShadow: theme.shadows[6],
+            border: `1px solid ${alpha(theme.palette.primary.main, 0.2)}`,
+          }}
+        >
+          <Table>
+            <TableHead>
               <TableRow
-                key={index}
                 sx={{
-                  '&:nth-of-type(odd)': { backgroundColor: '#f9fbfd' },
-                  '&:hover': { backgroundColor: '#eef3f8', cursor: 'pointer' },
+                  backgroundColor: alpha(theme.palette.primary.main, 0.1),
                 }}
-                onClick={() => setSelectedProject(name)} // Open TaskTree on row click
               >
-                <TableCell align="center" sx={{ fontSize: '1rem' }}>
-                  {name}
+                <TableCell
+                  align="center"
+                  sx={{
+                    fontWeight: 'bold',
+                    color: theme.palette.primary.main,
+                    fontSize: '1.1rem',
+                  }}
+                >
+                  Project Names
                 </TableCell>
-                <TableCell align="center">
-                  <IconButton
-                    color="error"
-                    onClick={(e) => {
-                      e.stopPropagation(); // Prevent triggering row click
-                      handleDeleteClick(name);
-                    }}
-                    sx={{ '&:hover': { color: '#d32f2f' } }}
-                  >
-                    <DeleteIcon />
-                  </IconButton>
+                <TableCell
+                  align="center"
+                  sx={{
+                    fontWeight: 'bold',
+                    color: theme.palette.primary.main,
+                    fontSize: '1.1rem',
+                  }}
+                >
+                  Actions
                 </TableCell>
               </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </TableContainer>
+            </TableHead>
+            <TableBody>
+              {projectNames.map((name, index) => (
+                <TableRow
+                  key={index}
+                  sx={{
+                    transition: 'all 0.3s ease',
+                    '&:nth-of-type(odd)': {
+                      backgroundColor: alpha(theme.palette.primary.main, 0.05)
+                    },
+                    '&:hover': {
+                      backgroundColor: alpha(theme.palette.primary.main, 0.1),
+                      boxShadow: theme.shadows[1],
+                      cursor: 'pointer'
+                    },
+                  }}
+                  onClick={() => setSelectedProject(name)}
+                >
+                  <TableCell
+                    align="center"
+                    sx={{
+                      fontSize: '1rem',
+                      fontWeight: 500,
+                      color: theme.palette.text.primary,
+                    }}
+                  >
+                    {name}
+                  </TableCell>
+                  <TableCell align="center">
+                    <IconButton
+                      color="error"
+                      onClick={(e) => handleDeleteClick(name, e)}
+                      sx={{
+                        transition: 'all 0.3s ease',
+                        '&:hover': {
+                          backgroundColor: alpha(theme.palette.error.main, 0.1),
+                          transform: 'scale(1.2)',
+                          color: theme.palette.error.dark
+                        }
+                      }}
+                    >
+                      <DeleteIcon />
+                    </IconButton>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </TableContainer>
 
-      {/* Confirmation Dialog */}
-      <Dialog
-        open={dialogOpen}
-        onClose={handleCloseDialog}
-        sx={{
-          '& .MuiDialog-paper': {
-            borderRadius: 2,
-            boxShadow: '0px 6px 18px rgba(0, 0, 0, 0.2)',
-          },
-        }}
-      >
-        <DialogTitle sx={{ fontWeight: 'bold', color: '#d32f2f' }}>
-          Confirm Deletion
-        </DialogTitle>
-        <DialogContent>
-          <DialogContentText>
-            Are you sure you want to delete the project{' '}
-            <strong>{selectedProject}</strong>? This action cannot be undone.
-          </DialogContentText>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={handleCloseDialog} color="primary" variant="outlined">
-            Cancel
-          </Button>
-          <Button
-            onClick={handleConfirmDelete}
-            color="error"
-            variant="contained"
+        {/* Confirmation Dialog */}
+        <Dialog
+          open={dialogOpen}
+          onClose={handleCloseDialog}
+          sx={{
+            '& .MuiDialog-paper': {
+              borderRadius: 3,
+              boxShadow: theme.shadows[24],
+            },
+          }}
+        >
+          <DialogTitle
+            sx={{
+              fontWeight: 'bold',
+              color: theme.palette.error.main,
+              textAlign: 'center'
+            }}
           >
-            Delete
-          </Button>
-        </DialogActions>
-      </Dialog>
-    </Box>
+            Confirm Deletion
+          </DialogTitle>
+          <DialogContent>
+            <DialogContentText sx={{ textAlign: 'center' }}>
+              Are you sure you want to delete the project{' '}
+              <strong>{projectToDelete}</strong>? This action cannot be undone.
+            </DialogContentText>
+          </DialogContent>
+          <DialogActions sx={{ justifyContent: 'center', pb: 3 }}>
+            <Button
+              onClick={handleCloseDialog}
+              variant="outlined"
+              color="primary"
+              sx={{ mr: 2, borderRadius: 2 }}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleConfirmDelete}
+              variant="contained"
+              color="error"
+              sx={{ borderRadius: 2 }}
+            >
+              Delete
+            </Button>
+          </DialogActions>
+        </Dialog>
+      </Box>
+    </ThemeProvider>
   );
 };
 
